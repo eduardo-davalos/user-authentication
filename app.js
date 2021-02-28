@@ -1,4 +1,6 @@
 //jshint esversion:6
+//First of all add the dotenv for use of enviroment variables
+require('dotenv').config();
 
 //First initialize express
 const express = require("express");
@@ -15,15 +17,24 @@ app.use(bodyParser.urlencoded({extended: true}));
 const ejs = require("ejs");
 app.set('view engine', 'ejs');
 
-//now we inititialize mongoose
+//now we inititialize mongoose. and mongoose encryption
 const mongoose = require("mongoose");
+const encrypt = require("mongoose-encryption");
+
+//Create a connection to a database
 mongoose.connect("mongodb://localhost:27017/userDB",{useNewUrlParser:true, useUnifiedTopology: true});
 
+//We create a user schema for mantain our users
 const userSchema = new mongoose.Schema({
     email:String,
     password:String
 });
 
+
+//We add functionality to our schema, adding the secret, and the fields to encrypt
+userSchema.plugin(encrypt, {secret:process.env.SECRET, encryptedFields:["password"]});
+  
+//Create a new User model based on the schema
 const User = new mongoose.model("User",userSchema);
 
 /////////////////////////////////   APP METHODS  //////////////////////////////////
