@@ -6,3 +6,6 @@ Using Username and Password on Mongose database for register and login user
 
 Commit 2 8a41dc05d66aaf3f3376002acfd7fe9f5ec55483
 We add encryption and enviroment variables using mongoose-encryption and dotenv
+
+Commit 3 c8521071b36b239f98fa0ee381b670e70223cda8
+We replaced mongoose-encryption for Hash Password md5

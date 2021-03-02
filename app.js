@@ -17,9 +17,13 @@ app.use(bodyParser.urlencoded({extended: true}));
 const ejs = require("ejs");
 app.set('view engine', 'ejs');
 
-//now we inititialize mongoose. and md5
+//now we inititialize mongoose
+
 const mongoose = require("mongoose");
-const md5 = require("md5");
+//We initialize the variables to use bcrypt
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
+
 
 //Create a connection to a database
 mongoose.connect("mongodb://localhost:27017/userDB",{useNewUrlParser:true, useUnifiedTopology: true});
@@ -60,18 +64,20 @@ app.route("/login")
         {
             //if we found the user
             if(userObtained){
-                //if the password matches with the hash version
-                if(userObtained.password === md5(req.body.password))
-                { 
-                    //view new page
-                    res.render("secrets");
-                }
-                else
-                {
-                    //if password is incorrect notify
-                    res.send("Incorrect password");
-                }
-               
+                //if the password matches with the bcrypt hash version
+                bcrypt.compare(req.body.password, userObtained.password,function(error,result){
+                    //if matched
+                    if(result === true)
+                    { 
+                        //view new page
+                        res.render("secrets");
+                    }
+                    else
+                    {
+                        //if password is incorrect notify
+                        res.send("Incorrect password");
+                    }
+                });                  
             }
             //if not user found, send a message
             else{
@@ -89,18 +95,25 @@ app.route("/register")
     res.render("register");
 })
 //post method
-.post(function(req,res){
-    //create a new user based on the input form, we hash the password using md5
-    const nuevoUsuario = new User({email:req.body.username, password:md5(req.body.password)});
-    nuevoUsuario.save(function(err){
-        if(err){
-            res.send(err);
-        }
-        else
+.post(function(req,res)
+{
+    //We initiate the password hashing
+    bcrypt.hash(req.body.password, saltRounds, function(err,hash)
+    {
+        //create a new user based on the input form, we add the recieved hash as pass
+        const nuevoUsuario = new User({email:req.body.username, password:hash});
+        nuevoUsuario.save(function(err)
         {
-            //if no errors we log in to the page
-            res.render("secrets");
-        }
+            if(err)
+            {
+                res.send(err);
+            }
+            else
+            {
+                //if no errors we log in to the page
+                res.render("secrets");
+            }
+        });
     });
 });
 
