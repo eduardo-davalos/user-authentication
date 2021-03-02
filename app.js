@@ -17,9 +17,9 @@ app.use(bodyParser.urlencoded({extended: true}));
 const ejs = require("ejs");
 app.set('view engine', 'ejs');
 
-//now we inititialize mongoose. and mongoose encryption
+//now we inititialize mongoose. and md5
 const mongoose = require("mongoose");
-const encrypt = require("mongoose-encryption");
+const md5 = require("md5");
 
 //Create a connection to a database
 mongoose.connect("mongodb://localhost:27017/userDB",{useNewUrlParser:true, useUnifiedTopology: true});
@@ -30,10 +30,6 @@ const userSchema = new mongoose.Schema({
     password:String
 });
 
-
-//We add functionality to our schema, adding the secret, and the fields to encrypt
-userSchema.plugin(encrypt, {secret:process.env.SECRET, encryptedFields:["password"]});
-  
 //Create a new User model based on the schema
 const User = new mongoose.model("User",userSchema);
 
@@ -64,8 +60,8 @@ app.route("/login")
         {
             //if we found the user
             if(userObtained){
-                //if the password matches
-                if(userObtained.password === req.body.password)
+                //if the password matches with the hash version
+                if(userObtained.password === md5(req.body.password))
                 { 
                     //view new page
                     res.render("secrets");
@@ -85,18 +81,24 @@ app.route("/login")
     });
 });
 
+//register route
 app.route("/register")
+//get method
 .get(function(req,res){
+    //display register page
     res.render("register");
 })
+//post method
 .post(function(req,res){
-    const nuevoUsuario = new User({email:req.body.username, password:req.body.password});
+    //create a new user based on the input form, we hash the password using md5
+    const nuevoUsuario = new User({email:req.body.username, password:md5(req.body.password)});
     nuevoUsuario.save(function(err){
         if(err){
             res.send(err);
         }
         else
         {
+            //if no errors we log in to the page
             res.render("secrets");
         }
     });
