@@ -17,16 +17,28 @@ app.use(bodyParser.urlencoded({extended: true}));
 const ejs = require("ejs");
 app.set('view engine', 'ejs');
 
+//we define the passport session variables
+const session = require("express-session");
+const passport = require("passport");
+const passportLocalMongoose = require("passport-local-mongoose");
+
+//now we define a session
+app.use(session({
+    secret:"Our little secret.",
+    resave:false,
+    saveUninitialized:false
+}));
+
+//initialize passport
+app.use(passport.initialize());
+app.use(passport.session());
+
 //now we inititialize mongoose
-
 const mongoose = require("mongoose");
-//We initialize the variables to use bcrypt
-const bcrypt = require("bcrypt");
-const saltRounds = 10;
-
 
 //Create a connection to a database
 mongoose.connect("mongodb://localhost:27017/userDB",{useNewUrlParser:true, useUnifiedTopology: true});
+mongoose.set('useCreateIndex', true);
 
 //We create a user schema for mantain our users
 const userSchema = new mongoose.Schema({
@@ -34,55 +46,49 @@ const userSchema = new mongoose.Schema({
     password:String
 });
 
+//using passport into the mongoose db
+userSchema.plugin(passportLocalMongoose);
+
 //Create a new User model based on the schema
 const User = new mongoose.model("User",userSchema);
+
+//Now we will use passport to use our User model
+passport.use(User.createStrategy());
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
 
 /////////////////////////////////   APP METHODS  //////////////////////////////////
 
 //Show the main page
 app.get("/",function(req,res){
-    res.render("home");
+    validateSession(req,res, "home");
 });
 
 //Login page route
 app.route("/login")
 //Show login
 .get(function(req,res){
-    res.render("login");
+    validateSession(req,res, "login");
 })
 //Login user user
 .post(function(req,res){
-    //look user by username
-    User.findOne({email:req.body.username},function(err,userObtained){
-        //if there are errors, we show them
-        if(err)
-        {
-            res.send(err);
+    const user = new User({
+        username:req.body.username,
+        password:req.body.password
+    });
+    //passport function , to validate user against data base and create a session
+    req.login(user,function(err){
+        if(err){
+            console.log(err);
         }
-        //if no errors
         else
         {
-            //if we found the user
-            if(userObtained){
-                //if the password matches with the bcrypt hash version
-                bcrypt.compare(req.body.password, userObtained.password,function(error,result){
-                    //if matched
-                    if(result === true)
-                    { 
-                        //view new page
-                        res.render("secrets");
-                    }
-                    else
-                    {
-                        //if password is incorrect notify
-                        res.send("Incorrect password");
-                    }
-                });                  
-            }
-            //if not user found, send a message
-            else{
-                res.send("User not found");
-            }
+            //if no errors found, we call an authentication method to take us to secrets
+            //this create a cookie, so we can access without login again in this session
+            passport.authenticate("local")(req,res,function()
+            {
+                res.redirect("/secrets");
+            });
         }
     });
 });
@@ -91,31 +97,69 @@ app.route("/login")
 app.route("/register")
 //get method
 .get(function(req,res){
-    //display register page
-    res.render("register");
+    validateSession(req,res, "register");
 })
 //post method
 .post(function(req,res)
 {
-    //We initiate the password hashing
-    bcrypt.hash(req.body.password, saltRounds, function(err,hash)
+    //Thanks to passport we are able create users, under authentication methods.
+    User.register({username:req.body.username},req.body.password, function(err,user)
     {
-        //create a new user based on the input form, we add the recieved hash as pass
-        const nuevoUsuario = new User({email:req.body.username, password:hash});
-        nuevoUsuario.save(function(err)
+        //if we found an error
+        if(err)
         {
-            if(err)
+            //we return the user to the register page
+            console.log(err);
+            res.redirect("/register");
+        }
+        else
+        {
+            //if no errors found, we call an authentication method to take us to secrets
+            //this create a cookie, so we can access without login again in this session
+            passport.authenticate("local")(req,res,function()
             {
-                res.send(err);
-            }
-            else
-            {
-                //if no errors we log in to the page
-                res.render("secrets");
-            }
-        });
+                res.redirect("/secrets");
+            });
+        }
     });
 });
+
+//When the users tries to access to secrets
+app.get("/secrets", function(req,res){
+    //we checked if the user is authenticated, thanks to passport
+    if(req.isAuthenticated())
+    {
+        //if it is, we show secrets
+        res.render("secrets");
+    }
+    else
+    {
+        //if is not, we take him to login
+        res.redirect("/login");
+    }
+});
+
+//When the user goes to loguot 
+app.get("/logout", function(req,res){
+    //passport function that close the session
+    req.logout();
+    res.redirect("/");
+});
+
+function validateSession(req,res, requestedPage)
+{
+    //we checked if the user is authenticated, ussing passport
+    if(req.isAuthenticated())
+    {
+        //if it is, we show secrets
+        res.redirect("/secrets");
+    }
+    else
+    {
+        //display requestedPage page
+        res.render(requestedPage);
+    }
+}
 
 /////////////////////////////////  INITIALIZE APP  //////////////////////////////////
 
