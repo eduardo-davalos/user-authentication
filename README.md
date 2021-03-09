@@ -12,3 +12,6 @@ We replaced mongoose-encryption for Hash Password md5
 
 Commit 4 cd4e846835a1d838b53e31eb7d189204c344724f
 We replaced md5 for bcrypt and added salting to the hash
+
+Commit 5
+We add passport, session and cookies, and removed bcrypt

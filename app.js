@@ -24,7 +24,7 @@ const passportLocalMongoose = require("passport-local-mongoose");
 
 //now we define a session
 app.use(session({
-    secret:"Our little secret.",
+    secret:process.env.SECRET,
     resave:false,
     saveUninitialized:false
 }));
@@ -35,6 +35,7 @@ app.use(passport.session());
 
 //now we inititialize mongoose
 const mongoose = require("mongoose");
+const findOrCreate = require("mongoose-findorcreate");
 
 //Create a connection to a database
 mongoose.connect("mongodb://localhost:27017/userDB",{useNewUrlParser:true, useUnifiedTopology: true});
@@ -43,19 +44,68 @@ mongoose.set('useCreateIndex', true);
 //We create a user schema for mantain our users
 const userSchema = new mongoose.Schema({
     email:String,
-    password:String
+    password:String,
+    googleId:String,
+    facebookId:String
 });
 
 //using passport into the mongoose db
 userSchema.plugin(passportLocalMongoose);
+userSchema.plugin(findOrCreate);
 
 //Create a new User model based on the schema
 const User = new mongoose.model("User",userSchema);
 
 //Now we will use passport to use our User model
 passport.use(User.createStrategy());
-passport.serializeUser(User.serializeUser());
-passport.deserializeUser(User.deserializeUser());
+
+//We use a serialize and deserialize User function
+passport.serializeUser(function(user, done) {
+    done(null, user.id);
+  });
+  
+  passport.deserializeUser(function(id, done) {
+    User.findById(id, function(err, user) {
+      done(err, user);
+    });
+  });
+
+////Social Strategies
+
+//Now we are going to import google oauth passport package
+const GoogleStrategy = require("passport-google-oauth20").Strategy;
+
+//We initialize google strategy, sending clientid, secret, and callback url.
+passport.use(new GoogleStrategy({
+    clientID:     process.env.CLIENT_ID,
+    clientSecret: process.env.CLIENT_SECRET,
+    callbackURL: "http://localhost:3000/auth/google/secrets"
+  },
+  //If the user is found on google we use it
+  function(request, accessToken, refreshToken, profile, done) {
+      console.log(profile);
+      //create a new record on database
+    User.findOrCreate({ googleId: profile.id }, function (err, user) {
+      return done(err, user);
+    });
+  }
+));
+
+//We initialize facebook strategy, sending clientid, secret, and callback url.
+const FacebookStrategy = require("passport-facebook").Strategy;
+passport.use(new FacebookStrategy({
+    clientID: process.env.FACEBOOK_APP_ID,
+    clientSecret: process.env.FACEBOOK_APP_SECRET,
+    callbackURL: "http://localhost:3000/auth/facebook/secrets"
+  },
+  //If the user is found on facebook we use it
+  function(accessToken, refreshToken, profile, cb) {
+      //create a new record on database
+    User.findOrCreate({ facebookId: profile.id }, function (err, user) {
+      return cb(err, user);
+    });
+  }
+));
 
 /////////////////////////////////   APP METHODS  //////////////////////////////////
 
@@ -63,6 +113,31 @@ passport.deserializeUser(User.deserializeUser());
 app.get("/",function(req,res){
     validateSession(req,res, "home");
 });
+
+//Login page for google website
+app.get('/auth/google',
+  passport.authenticate('google', { scope:
+      [ 'email', 'profile' ] }
+));
+
+//If the google server respond , we redirect
+app.get( '/auth/google/secrets',
+    passport.authenticate( 'google', {
+        successRedirect: '/secrets',
+        failureRedirect: '/login'
+}));
+
+//Login page for facebook website
+app.get('/auth/facebook',
+  passport.authenticate('facebook'));
+
+//If the facebook server respond , we redirect
+app.get('/auth/facebook/secrets',
+  passport.authenticate('facebook', { failureRedirect: '/login' }),
+  function(req, res) {
+    // Successful authentication, redirect home.
+    res.redirect('/secrets');
+  });
 
 //Login page route
 app.route("/login")
