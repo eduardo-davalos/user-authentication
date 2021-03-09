@@ -46,7 +46,8 @@ const userSchema = new mongoose.Schema({
     email:String,
     password:String,
     googleId:String,
-    facebookId:String
+    facebookId:String,
+    secret:String
 });
 
 //using passport into the mongoose db
@@ -201,17 +202,52 @@ app.route("/register")
 
 //When the users tries to access to secrets
 app.get("/secrets", function(req,res){
+    User.find({"secret":{$ne:null}}, function(err,foundUsers){
+        if(err){
+            console.log(err)
+        }else{
+            if(foundUsers){
+                res.render("secrets", {usersWithSecrets:foundUsers});
+            }
+        }
+    });
+});
+
+//When the users tries to access to sumbit
+app.get("/submit", function(req,res){
     //we checked if the user is authenticated, thanks to passport
     if(req.isAuthenticated())
     {
-        //if it is, we show secrets
-        res.render("secrets");
+        //if it is, we show submit
+        res.render("submit");
     }
     else
     {
         //if is not, we take him to login
         res.redirect("/login");
     }
+});
+
+//When te users send a new secret
+app.post("/submit", function(req,res){
+    //we found the user
+    User.findById(req.user.id, function(err, foundUser){
+        //if error
+        if(err){
+            console.log(err);
+        }
+        else{
+            //if not errors and user found
+            if(foundUser){
+                //we assign the secret
+            foundUser.secret = req.body.secret;
+            //Save and redirect
+            foundUser.save(function(){
+                res.redirect("/secrets");
+            });
+            }
+        }
+    });
 });
 
 //When the user goes to loguot 
