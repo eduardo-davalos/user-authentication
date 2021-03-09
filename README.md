@@ -13,5 +13,11 @@ We replaced mongoose-encryption for Hash Password md5
 Commit 4 cd4e846835a1d838b53e31eb7d189204c344724f
 We replaced md5 for bcrypt and added salting to the hash
 
-Commit 5
+Commit 5 3b63a9d1699e6f1edf6f98554d7b0cbdc621445c
 We add passport, session and cookies, and removed bcrypt
+
+Commit 6 a3d67ed6eccbf74b09d9332691e452c6a8c8ee8a
+Adding OAuth ussing passport for facebook and for google
+
+Commit 7 ceff799a7a14855a0289c36c9cafb047303366cd
+Create the submit secret functionality
